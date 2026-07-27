@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Task API - Swagger UI</title>
+<style>
+  *{box-sizing:border-box} body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fafafa;color:#3b4151}
+  .top{background:#1b1b1b;color:white;padding:14px 46px;font-size:18px;font-weight:700;display:flex;align-items:center;gap:16px}
+  .mark{background:#85ea2d;color:#111;border-radius:4px;padding:5px 8px;font-weight:900}
+  main{max-width:1180px;margin:32px auto;padding:0 24px}
+  h1{font-size:36px;margin:0 0 8px}.version{font-size:12px;background:#7d8492;color:white;padding:4px 7px;border-radius:12px;vertical-align:middle}
+  .desc{font-size:16px;margin-bottom:28px}.scheme{border:1px solid #d8dde7;background:white;padding:14px 18px;margin-bottom:24px;border-radius:4px}
+  .tag{font-size:24px;font-weight:700;margin:26px 0 12px;border-bottom:1px solid #ddd;padding-bottom:10px}
+  .op{display:grid;grid-template-columns:88px 210px 1fr 20px;align-items:center;border-radius:4px;margin:10px 0;padding:11px 14px;border:1px solid}
+  .method{color:white;text-align:center;font-weight:700;padding:7px;border-radius:3px}.path{font-family:monospace;font-size:16px;font-weight:700}.summary{font-size:14px}
+  .get{background:#e7f1fb;border-color:#61affe}.get .method{background:#61affe}.post{background:#e8f6f0;border-color:#49cc90}.post .method{background:#49cc90}
+  .put{background:#fbf1e6;border-color:#fca130}.put .method{background:#fca130}.delete{background:#fbe9e9;border-color:#f93e3e}.delete .method{background:#f93e3e}
+  .chev{font-size:24px}.models{margin-top:30px;border:1px solid #ddd;background:white;padding:18px}.models h2{margin:0 0 12px}
+  .model{font-family:monospace;border-top:1px solid #eee;padding:12px 0;color:#555}
+</style>
+</head>
+<body>
+  <div class="top"><span class="mark">SWAGGER</span> Task API Documentation</div>
+  <main>
+    <h1>Task API <span class="version">1.0.0</span></h1>
+    <div class="desc">An in-memory CRUD API for managing tasks. Data resets whenever the server restarts.</div>
+    <div class="scheme"><strong>Servers</strong>&nbsp;&nbsp; http://localhost:8000</div>
+
+    <div class="tag">System <small style="font-size:14px;font-weight:400">API information and health checks</small></div>
+    <div class="op get"><div class="method">GET</div><div class="path">/</div><div class="summary">Get API information</div><div class="chev">⌄</div></div>
+    <div class="op get"><div class="method">GET</div><div class="path">/health</div><div class="summary">Check server health</div><div class="chev">⌄</div></div>
+
+    <div class="tag">Tasks <small style="font-size:14px;font-weight:400">Create, read, update, and delete tasks</small></div>
+    <div class="op get"><div class="method">GET</div><div class="path">/tasks</div><div class="summary">List all tasks</div><div class="chev">⌄</div></div>
+    <div class="op post"><div class="method">POST</div><div class="path">/tasks</div><div class="summary">Create a task</div><div class="chev">⌄</div></div>
+    <div class="op get"><div class="method">GET</div><div class="path">/tasks/{task_id}</div><div class="summary">Get one task</div><div class="chev">⌄</div></div>
+    <div class="op put"><div class="method">PUT</div><div class="path">/tasks/{task_id}</div><div class="summary">Update a task</div><div class="chev">⌄</div></div>
+    <div class="op delete"><div class="method">DELETE</div><div class="path">/tasks/{task_id}</div><div class="summary">Delete a task</div><div class="chev">⌄</div></div>
+
+    <div class="models"><h2>Schemas</h2><div class="model">TaskCreate { title: string }</div><div class="model">TaskUpdate { title?: string, done?: boolean }</div><div class="model">HTTPValidationError { error: string }</div></div>
+  </main>
+</body>
+</html>
