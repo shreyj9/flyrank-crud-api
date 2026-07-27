@@ -5,7 +5,20 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator, model_validator
 
-app = FastAPI()
+app = FastAPI(
+    title="Task API",
+    version="1.0.0",
+    description=(
+        "An in-memory CRUD API for managing tasks. "
+        "Data resets whenever the server restarts."
+    ),
+    docs_url="/docs",
+    openapi_url="/openapi.json",
+    openapi_tags=[
+        {"name": "System", "description": "API information and health checks"},
+        {"name": "Tasks", "description": "Create, read, update, and delete tasks"},
+    ],
+)
 
 tasks = [
     {"id": 1, "title": "Learn FastAPI basics", "done": True},
@@ -64,27 +77,27 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
     return JSONResponse(status_code=400, content={"error": message})
 
 
-@app.get("/")
+@app.get("/", tags=["System"], summary="Get API information")
 def api_info():
     return {"name": "Task API", "version": "1.0", "endpoints": ["/tasks"]}
 
 
-@app.get("/health")
+@app.get("/health", tags=["System"], summary="Check server health")
 def health_check():
     return {"status": "ok"}
 
 
-@app.get("/tasks")
+@app.get("/tasks", tags=["Tasks"], summary="List all tasks")
 def list_tasks():
     return tasks
 
 
-@app.get("/tasks/{task_id}")
+@app.get("/tasks/{task_id}", tags=["Tasks"], summary="Get one task")
 def get_task(task_id: int):
     return find_task(task_id)
 
 
-@app.post("/tasks", status_code=201)
+@app.post("/tasks", status_code=201, tags=["Tasks"], summary="Create a task")
 def create_task(payload: TaskCreate):
     next_id = max((task["id"] for task in tasks), default=0) + 1
     task = {"id": next_id, "title": payload.title, "done": False}
@@ -92,7 +105,7 @@ def create_task(payload: TaskCreate):
     return task
 
 
-@app.put("/tasks/{task_id}")
+@app.put("/tasks/{task_id}", tags=["Tasks"], summary="Update a task")
 def update_task(task_id: int, payload: TaskUpdate):
     task = find_task(task_id)
     if "title" in payload.model_fields_set:
@@ -102,7 +115,7 @@ def update_task(task_id: int, payload: TaskUpdate):
     return task
 
 
-@app.delete("/tasks/{task_id}", status_code=204)
+@app.delete("/tasks/{task_id}", status_code=204, tags=["Tasks"], summary="Delete a task")
 def delete_task(task_id: int):
     task = find_task(task_id)
     tasks.remove(task)
