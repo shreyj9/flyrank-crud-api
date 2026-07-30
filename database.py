@@ -106,7 +106,21 @@ def fetch_task(task_id: int) -> dict[str, object] | None:
 
 
 def insert_task(title: str) -> dict[str, object]:
-    raise NotImplementedError("Implemented in Stage 3")
+    """Insert a new incomplete task and return the created row."""
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO tasks (title, done)
+                VALUES (%s, %s)
+                RETURNING id, title, done
+                """,
+                (title, False),
+            )
+            row = cursor.fetchone()
+    if row is None:
+        raise RuntimeError("Postgres did not return the created task")
+    return row_to_task(row)
 
 
 def update_task_record(
@@ -117,8 +131,42 @@ def update_task_record(
     update_title: bool,
     update_done: bool,
 ) -> dict[str, object] | None:
-    raise NotImplementedError("Implemented in Stage 3")
+    """Update selected fields with parameters and return the changed task."""
+    assignments: list[str] = []
+    values: list[object] = []
+
+    if update_title:
+        assignments.append("title = %s")
+        values.append(title)
+    if update_done:
+        assignments.append("done = %s")
+        values.append(bool(done))
+
+    if not assignments:
+        return fetch_task(task_id)
+
+    values.append(task_id)
+    query = f"""
+        UPDATE tasks
+        SET {', '.join(assignments)}
+        WHERE id = %s
+        RETURNING id, title, done
+    """
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(query, values)
+            row = cursor.fetchone()
+    return row_to_task(row) if row is not None else None
 
 
 def delete_task_record(task_id: int) -> bool:
-    raise NotImplementedError("Implemented in Stage 3")
+    """Delete a task with a parameterized query and report success."""
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "DELETE FROM tasks WHERE id = %s RETURNING id",
+                (task_id,),
+            )
+            deleted_row = cursor.fetchone()
+    return deleted_row is not None

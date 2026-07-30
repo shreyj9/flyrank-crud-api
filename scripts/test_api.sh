@@ -25,7 +25,7 @@ check 404 "$BASE_URL/tasks/999999"
 
 check 201 -X POST "$BASE_URL/tasks" \
   -H 'Content-Type: application/json' \
-  -d '{"title":"Buy milk"}'
+  -d '{"title":"Postgres CRUD test"}'
 CREATED_ID=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])' < "$RESPONSE_FILE")
 
 check 400 -X POST "$BASE_URL/tasks" \
@@ -34,7 +34,7 @@ check 400 -X POST "$BASE_URL/tasks" \
 
 check 200 -X PUT "$BASE_URL/tasks/$CREATED_ID" \
   -H 'Content-Type: application/json' \
-  -d '{"title":"Buy oat milk","done":true}'
+  -d '{"title":"Postgres CRUD test updated","done":true}'
 
 check 400 -X PUT "$BASE_URL/tasks/$CREATED_ID" \
   -H 'Content-Type: application/json' \
