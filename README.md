@@ -189,3 +189,13 @@ The repository preserves the BE-01 history and adds one meaningful commit for ea
 4. `Stage 3: update and delete with SQL`
 5. `Stage 4: explored SQLite`
 6. `Stage 5: database documentation`
+
+## BE-04 Stage 0: standalone Postgres container
+
+Before the Compose stack is introduced, Postgres can be started independently with:
+
+```bash
+POSTGRES_PASSWORD=dev ./scripts/postgres_container.sh start
+```
+
+The helper mounts the named Docker volume `taskdata`, so rows outlive the container.

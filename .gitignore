@@ -9,3 +9,6 @@ __pycache__/
 tasks.db
 tasks.db-shm
 tasks.db-wal
+
+# Local Docker/Postgres runtime artifacts
+*.log
