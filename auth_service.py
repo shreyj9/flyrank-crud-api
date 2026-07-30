@@ -75,3 +75,11 @@ def verify_access_token(token: str) -> dict[str, object | None]:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
     return serialize_user(response.user)
+
+
+def logout_current_session() -> None:
+    """Ask Supabase to revoke the current session's refresh token."""
+    try:
+        supabase.auth.sign_out()
+    except Exception as error:
+        raise HTTPException(status_code=503, detail="Unable to end session") from error

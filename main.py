@@ -1,12 +1,14 @@
-from fastapi import FastAPI, Header, HTTPException, Request, Response
+from typing import Annotated
 
-from auth_security import require_bearer_token
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
+
+from auth_security import AuthenticatedUser, get_current_user
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator, model_validator
 
 from auth_models import AuthCredentials
-from auth_service import login_user, signup_user, verify_access_token
+from auth_service import login_user, logout_current_session, signup_user
 
 from database import (
     delete_task_record,
@@ -134,9 +136,43 @@ def public_info():
     tags=["Protected"],
     summary="Read a protected profile",
 )
-def protected_profile(authorization: str | None = Header(default=None)):
-    token = require_bearer_token(authorization)
-    return {"user": verify_access_token(token)}
+def protected_profile(
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+):
+    return {
+        "user": {
+            "id": current_user.id,
+            "email": current_user.email,
+            "created_at": current_user.created_at,
+        }
+    }
+
+
+@app.get(
+    "/protected/dashboard",
+    tags=["Protected"],
+    summary="Read a second protected resource",
+)
+def protected_dashboard(
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+):
+    return {
+        "message": "Authenticated dashboard access granted",
+        "user_id": current_user.id,
+    }
+
+
+@app.post(
+    "/auth/logout",
+    status_code=204,
+    tags=["Authentication"],
+    summary="Log out the current Supabase session",
+)
+def auth_logout(
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+):
+    logout_current_session()
+    return Response(status_code=204)
 
 @app.get("/tasks", tags=["Tasks"], summary="List all tasks")
 def list_tasks():
