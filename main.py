@@ -3,6 +3,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator, model_validator
 
+from auth_models import AuthCredentials
+from auth_service import login_user, signup_user
+
 from database import (
     delete_task_record,
     fetch_all_tasks,
@@ -26,6 +29,7 @@ app = FastAPI(
     openapi_tags=[
         {"name": "System", "description": "API information and health checks"},
         {"name": "Tasks", "description": "Create, read, update, and delete tasks"},
+        {"name": "Authentication", "description": "Supabase sign up and login"},
     ],
 )
 
@@ -89,6 +93,26 @@ def api_info():
 def health_check():
     return {"status": "ok"}
 
+
+
+
+@app.post(
+    "/auth/signup",
+    status_code=201,
+    tags=["Authentication"],
+    summary="Create a Supabase user account",
+)
+def auth_signup(payload: AuthCredentials):
+    return signup_user(payload.email, payload.password)
+
+
+@app.post(
+    "/auth/login",
+    tags=["Authentication"],
+    summary="Log in and receive Supabase tokens",
+)
+def auth_login(payload: AuthCredentials):
+    return login_user(payload.email, payload.password)
 
 @app.get("/tasks", tags=["Tasks"], summary="List all tasks")
 def list_tasks():
