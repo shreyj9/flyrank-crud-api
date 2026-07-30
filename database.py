@@ -1,59 +1,81 @@
-"""SQLite database setup for the Task API."""
+"""Postgres repository for the Task API.
+
+The public functions in this module intentionally match the SQLite repository
+used in BE-02. The FastAPI routes can keep calling the same interface while the
+storage engine changes underneath them.
+"""
 
 from __future__ import annotations
 
 import os
-import sqlite3
+import time
 from pathlib import Path
+from typing import Any
 
-DEFAULT_DATABASE_PATH = Path(__file__).resolve().parent / "tasks.db"
+import psycopg
+from dotenv import load_dotenv
+from psycopg.rows import dict_row
 
+load_dotenv()
+
+SCHEMA_PATH = Path(__file__).resolve().parent / "sql" / "postgres_schema.sql"
 SEED_TASKS = (
-    ("Learn FastAPI basics", 1),
-    ("Build CRUD endpoints", 0),
-    ("Document the API", 0),
+    ("Learn FastAPI basics", True),
+    ("Build CRUD endpoints", False),
+    ("Document the API", False),
 )
 
 
-def get_database_path() -> Path:
-    """Return the configured database path, defaulting to tasks.db."""
-    configured_path = os.getenv("TASKS_DB_PATH")
-    return Path(configured_path).expanduser().resolve() if configured_path else DEFAULT_DATABASE_PATH
-
-
-def get_connection() -> sqlite3.Connection:
-    """Open a SQLite connection whose rows can be accessed by column name."""
-    connection = sqlite3.connect(get_database_path())
-    connection.row_factory = sqlite3.Row
-    return connection
-
-
-def initialize_database() -> None:
-    """Create the tasks table and seed it only when it is empty."""
-    with get_connection() as connection:
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS tasks (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                done INTEGER NOT NULL DEFAULT 0 CHECK (done IN (0, 1))
-            )
-            """
+def get_database_url() -> str:
+    """Return DATABASE_URL or fail with a useful configuration error."""
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        raise RuntimeError(
+            "DATABASE_URL is not set. Copy .env.example to .env before starting the app."
         )
-
-        task_count = connection.execute(
-            "SELECT COUNT(*) AS count FROM tasks"
-        ).fetchone()["count"]
-
-        if task_count == 0:
-            connection.executemany(
-                "INSERT INTO tasks (title, done) VALUES (?, ?)",
-                SEED_TASKS,
-            )
+    return database_url
 
 
-def row_to_task(row: sqlite3.Row) -> dict[str, object]:
-    """Convert a SQLite row into the API's JSON-friendly task shape."""
+def get_connection() -> psycopg.Connection[dict[str, Any]]:
+    """Open a Postgres connection whose rows are returned as dictionaries."""
+    return psycopg.connect(
+        get_database_url(),
+        row_factory=dict_row,
+        connect_timeout=3,
+    )
+
+
+def initialize_database(max_attempts: int = 30, delay_seconds: float = 1.0) -> None:
+    """Wait for Postgres, create the table, and seed it only when empty."""
+    schema_sql = SCHEMA_PATH.read_text(encoding="utf-8")
+    last_error: Exception | None = None
+
+    for attempt in range(1, max_attempts + 1):
+        try:
+            with get_connection() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(schema_sql)
+                    cursor.execute("SELECT COUNT(*) AS count FROM tasks")
+                    task_count = int(cursor.fetchone()["count"])
+                    if task_count == 0:
+                        cursor.executemany(
+                            "INSERT INTO tasks (title, done) VALUES (%s, %s)",
+                            SEED_TASKS,
+                        )
+            return
+        except psycopg.OperationalError as error:
+            last_error = error
+            if attempt == max_attempts:
+                break
+            time.sleep(delay_seconds)
+
+    raise RuntimeError(
+        f"Could not connect to Postgres after {max_attempts} attempts"
+    ) from last_error
+
+
+def row_to_task(row: dict[str, Any]) -> dict[str, object]:
+    """Convert a Postgres row into the API's JSON task shape."""
     return {
         "id": int(row["id"]),
         "title": str(row["title"]),
@@ -61,38 +83,17 @@ def row_to_task(row: sqlite3.Row) -> dict[str, object]:
     }
 
 
+# Stages 2 and 3 fill in the CRUD methods while preserving this interface.
 def fetch_all_tasks() -> list[dict[str, object]]:
-    """Return every task ordered by id."""
-    with get_connection() as connection:
-        rows = connection.execute(
-            "SELECT id, title, done FROM tasks ORDER BY id"
-        ).fetchall()
-    return [row_to_task(row) for row in rows]
+    raise NotImplementedError("Implemented in Stage 2")
 
 
 def fetch_task(task_id: int) -> dict[str, object] | None:
-    """Return one task, or None when the id is unknown."""
-    with get_connection() as connection:
-        row = connection.execute(
-            "SELECT id, title, done FROM tasks WHERE id = ?",
-            (task_id,),
-        ).fetchone()
-    return row_to_task(row) if row is not None else None
+    raise NotImplementedError("Implemented in Stage 2")
 
 
 def insert_task(title: str) -> dict[str, object]:
-    """Insert a new incomplete task and return it."""
-    with get_connection() as connection:
-        cursor = connection.execute(
-            "INSERT INTO tasks (title, done) VALUES (?, 0)",
-            (title,),
-        )
-        task_id = int(cursor.lastrowid)
-
-    created_task = fetch_task(task_id)
-    if created_task is None:  # Defensive: the inserted row should always exist.
-        raise RuntimeError("Created task could not be loaded")
-    return created_task
+    raise NotImplementedError("Implemented in Stage 3")
 
 
 def update_task_record(
@@ -103,37 +104,8 @@ def update_task_record(
     update_title: bool,
     update_done: bool,
 ) -> dict[str, object] | None:
-    """Update selected task fields and return the updated task."""
-    assignments: list[str] = []
-    values: list[object] = []
-
-    if update_title:
-        assignments.append("title = ?")
-        values.append(title)
-    if update_done:
-        assignments.append("done = ?")
-        values.append(int(bool(done)))
-
-    if not assignments:
-        return fetch_task(task_id)
-
-    values.append(task_id)
-    with get_connection() as connection:
-        cursor = connection.execute(
-            f"UPDATE tasks SET {', '.join(assignments)} WHERE id = ?",
-            values,
-        )
-        if cursor.rowcount == 0:
-            return None
-
-    return fetch_task(task_id)
+    raise NotImplementedError("Implemented in Stage 3")
 
 
 def delete_task_record(task_id: int) -> bool:
-    """Delete a task and report whether a row was removed."""
-    with get_connection() as connection:
-        cursor = connection.execute(
-            "DELETE FROM tasks WHERE id = ?",
-            (task_id,),
-        )
-        return cursor.rowcount > 0
+    raise NotImplementedError("Implemented in Stage 3")

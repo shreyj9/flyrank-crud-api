@@ -18,8 +18,8 @@ app = FastAPI(
     title="Task API",
     version="1.0.0",
     description=(
-        "A SQLite-backed CRUD API for managing tasks. "
-        "Data persists when the server restarts."
+        "A Postgres-backed CRUD API for managing tasks. "
+        "Data persists across app and container restarts."
     ),
     docs_url="/docs",
     openapi_url="/openapi.json",
