@@ -1,13 +1,21 @@
-"""Reusable authentication dependency for protected FastAPI routes."""
+"""Reusable Supabase bearer-token security for protected FastAPI routes."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Annotated
 
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, HTTPException, Security
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from auth_service import verify_access_token
+
+bearer_scheme = HTTPBearer(
+    auto_error=False,
+    bearerFormat="JWT",
+    scheme_name="SupabaseBearer",
+    description="Paste the access_token returned by POST /auth/login.",
+)
 
 
 @dataclass(frozen=True)
@@ -19,23 +27,25 @@ class AuthenticatedUser:
 
 
 def require_bearer_token(
-    authorization: Annotated[str | None, Header()] = None,
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None,
+        Security(bearer_scheme),
+    ] = None,
 ) -> str:
-    """Require an Authorization: Bearer <token> header and return the token."""
-    if authorization is None:
+    """Require a correctly formatted Bearer token and return its value."""
+    if credentials is None:
         raise HTTPException(status_code=401, detail="Access token required")
 
-    scheme, separator, token = authorization.partition(" ")
-    if not separator or scheme.lower() != "bearer" or not token.strip():
+    if credentials.scheme.lower() != "bearer" or not credentials.credentials.strip():
         raise HTTPException(status_code=401, detail="Access token required")
 
-    return token.strip()
+    return credentials.credentials.strip()
 
 
 def get_current_user(
     token: Annotated[str, Depends(require_bearer_token)],
 ) -> AuthenticatedUser:
-    """Verify the bearer token once and inject the authenticated user."""
+    """Verify the token once and inject the authenticated user into a route."""
     user = verify_access_token(token)
     return AuthenticatedUser(
         id=str(user["id"]),

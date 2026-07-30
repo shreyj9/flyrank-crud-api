@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response, Security
 
 from auth_security import AuthenticatedUser, get_current_user
 from fastapi.exceptions import RequestValidationError
@@ -20,13 +20,12 @@ from database import (
 )
 
 initialize_database()
-
 app = FastAPI(
-    title="Task API",
-    version="1.0.0",
+    title="Task API with Supabase Auth",
+    version="2.0.0",
     description=(
-        "A Postgres-backed CRUD API for managing tasks. "
-        "Data persists across app and container restarts."
+        "A Postgres-backed task API secured with Supabase Auth. "
+        "Use the Swagger Authorize button with a Supabase access token."
     ),
     docs_url="/docs",
     openapi_url="/openapi.json",
@@ -42,7 +41,6 @@ app = FastAPI(
 
 class TaskCreate(BaseModel):
     title: str
-
     @field_validator("title")
     @classmethod
     def validate_title(cls, value: str) -> str:
@@ -54,14 +52,12 @@ class TaskCreate(BaseModel):
 class TaskUpdate(BaseModel):
     title: str | None = None
     done: bool | None = None
-
     @field_validator("title")
     @classmethod
     def validate_title(cls, value: str | None) -> str | None:
         if value is not None and not value.strip():
             raise ValueError("Title must be a non-empty string")
         return value.strip() if value is not None else None
-
     @model_validator(mode="after")
     def require_a_field(self):
         if "title" not in self.model_fields_set and "done" not in self.model_fields_set:
@@ -75,11 +71,9 @@ def find_task(task_id: int) -> dict[str, object]:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
 
-
 @app.exception_handler(HTTPException)
 async def http_error_handler(request: Request, exc: HTTPException):
     return JSONResponse(status_code=exc.status_code, content={"error": exc.detail})
-
 
 @app.exception_handler(RequestValidationError)
 async def validation_error_handler(request: Request, exc: RequestValidationError):
@@ -89,10 +83,13 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
         message = message.removeprefix("Value error, ")
     return JSONResponse(status_code=400, content={"error": message})
 
-
 @app.get("/", tags=["System"], summary="Get API information")
 def api_info():
-    return {"name": "Task API", "version": "1.0", "endpoints": ["/tasks"]}
+    return {
+        "name": "Task API with Supabase Auth",
+        "version": "2.0",
+        "endpoints": ["/tasks", "/auth/signup", "/auth/login", "/public/info", "/protected/profile"],
+    }
 
 
 @app.get("/health", tags=["System"], summary="Check server health")
@@ -137,7 +134,7 @@ def public_info():
     summary="Read a protected profile",
 )
 def protected_profile(
-    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    current_user: Annotated[AuthenticatedUser, Security(get_current_user)],
 ):
     return {
         "user": {
@@ -154,7 +151,7 @@ def protected_profile(
     summary="Read a second protected resource",
 )
 def protected_dashboard(
-    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    current_user: Annotated[AuthenticatedUser, Security(get_current_user)],
 ):
     return {
         "message": "Authenticated dashboard access granted",
@@ -169,7 +166,7 @@ def protected_dashboard(
     summary="Log out the current Supabase session",
 )
 def auth_logout(
-    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    current_user: Annotated[AuthenticatedUser, Security(get_current_user)],
 ):
     logout_current_session()
     return Response(status_code=204)
@@ -183,11 +180,9 @@ def list_tasks():
 def get_task(task_id: int):
     return find_task(task_id)
 
-
 @app.post("/tasks", status_code=201, tags=["Tasks"], summary="Create a task")
 def create_task(payload: TaskCreate):
     return insert_task(payload.title)
-
 
 @app.put("/tasks/{task_id}", tags=["Tasks"], summary="Update a task")
 def update_task(task_id: int, payload: TaskUpdate):
@@ -201,7 +196,6 @@ def update_task(task_id: int, payload: TaskUpdate):
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
-
 
 @app.delete("/tasks/{task_id}", status_code=204, tags=["Tasks"], summary="Delete a task")
 def delete_task(task_id: int):
