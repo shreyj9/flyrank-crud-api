@@ -83,13 +83,26 @@ def row_to_task(row: dict[str, Any]) -> dict[str, object]:
     }
 
 
-# Stages 2 and 3 fill in the CRUD methods while preserving this interface.
+# CRUD methods preserve the interface used by the FastAPI routes.
 def fetch_all_tasks() -> list[dict[str, object]]:
-    raise NotImplementedError("Implemented in Stage 2")
+    """Return every task ordered by id."""
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT id, title, done FROM tasks ORDER BY id")
+            rows = cursor.fetchall()
+    return [row_to_task(row) for row in rows]
 
 
 def fetch_task(task_id: int) -> dict[str, object] | None:
-    raise NotImplementedError("Implemented in Stage 2")
+    """Return one task using a parameterized query, or None if missing."""
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT id, title, done FROM tasks WHERE id = %s",
+                (task_id,),
+            )
+            row = cursor.fetchone()
+    return row_to_task(row) if row is not None else None
 
 
 def insert_task(title: str) -> dict[str, object]:
