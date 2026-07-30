@@ -1,11 +1,16 @@
-from typing import Any
-
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator, model_validator
 
-from database import fetch_all_tasks, fetch_task, initialize_database, insert_task
+from database import (
+    delete_task_record,
+    fetch_all_tasks,
+    fetch_task,
+    initialize_database,
+    insert_task,
+    update_task_record,
+)
 
 initialize_database()
 
@@ -23,12 +28,6 @@ app = FastAPI(
         {"name": "Tasks", "description": "Create, read, update, and delete tasks"},
     ],
 )
-
-tasks = [
-    {"id": 1, "title": "Learn FastAPI basics", "done": True},
-    {"id": 2, "title": "Build CRUD endpoints", "done": False},
-    {"id": 3, "title": "Document the API", "done": False},
-]
 
 
 class TaskCreate(BaseModel):
@@ -60,7 +59,7 @@ class TaskUpdate(BaseModel):
         return self
 
 
-def find_task(task_id: int) -> dict[str, Any]:
+def find_task(task_id: int) -> dict[str, object]:
     task = fetch_task(task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -108,16 +107,20 @@ def create_task(payload: TaskCreate):
 
 @app.put("/tasks/{task_id}", tags=["Tasks"], summary="Update a task")
 def update_task(task_id: int, payload: TaskUpdate):
-    task = find_task(task_id)
-    if "title" in payload.model_fields_set:
-        task["title"] = payload.title
-    if "done" in payload.model_fields_set:
-        task["done"] = payload.done
+    task = update_task_record(
+        task_id,
+        title=payload.title,
+        done=payload.done,
+        update_title="title" in payload.model_fields_set,
+        update_done="done" in payload.model_fields_set,
+    )
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
     return task
 
 
 @app.delete("/tasks/{task_id}", status_code=204, tags=["Tasks"], summary="Delete a task")
 def delete_task(task_id: int):
-    task = find_task(task_id)
-    tasks.remove(task)
+    if not delete_task_record(task_id):
+        raise HTTPException(status_code=404, detail="Task not found")
     return Response(status_code=204)

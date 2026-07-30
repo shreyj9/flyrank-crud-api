@@ -93,3 +93,47 @@ def insert_task(title: str) -> dict[str, object]:
     if created_task is None:  # Defensive: the inserted row should always exist.
         raise RuntimeError("Created task could not be loaded")
     return created_task
+
+
+def update_task_record(
+    task_id: int,
+    *,
+    title: str | None,
+    done: bool | None,
+    update_title: bool,
+    update_done: bool,
+) -> dict[str, object] | None:
+    """Update selected task fields and return the updated task."""
+    assignments: list[str] = []
+    values: list[object] = []
+
+    if update_title:
+        assignments.append("title = ?")
+        values.append(title)
+    if update_done:
+        assignments.append("done = ?")
+        values.append(int(bool(done)))
+
+    if not assignments:
+        return fetch_task(task_id)
+
+    values.append(task_id)
+    with get_connection() as connection:
+        cursor = connection.execute(
+            f"UPDATE tasks SET {', '.join(assignments)} WHERE id = ?",
+            values,
+        )
+        if cursor.rowcount == 0:
+            return None
+
+    return fetch_task(task_id)
+
+
+def delete_task_record(task_id: int) -> bool:
+    """Delete a task and report whether a row was removed."""
+    with get_connection() as connection:
+        cursor = connection.execute(
+            "DELETE FROM tasks WHERE id = ?",
+            (task_id,),
+        )
+        return cursor.rowcount > 0
