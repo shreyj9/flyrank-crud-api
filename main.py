@@ -1,4 +1,6 @@
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, Header, HTTPException, Request, Response
+
+from auth_security import require_bearer_token
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator, model_validator
@@ -30,6 +32,8 @@ app = FastAPI(
         {"name": "System", "description": "API information and health checks"},
         {"name": "Tasks", "description": "Create, read, update, and delete tasks"},
         {"name": "Authentication", "description": "Supabase sign up and login"},
+        {"name": "Public", "description": "Endpoints available without authentication"},
+        {"name": "Protected", "description": "Endpoints requiring a bearer token"},
     ],
 )
 
@@ -113,6 +117,28 @@ def auth_signup(payload: AuthCredentials):
 )
 def auth_login(payload: AuthCredentials):
     return login_user(payload.email, payload.password)
+
+
+
+@app.get(
+    "/public/info",
+    tags=["Public"],
+    summary="Read public information",
+)
+def public_info():
+    return {"message": "Welcome stranger! This info is public."}
+
+
+@app.get(
+    "/protected/profile",
+    tags=["Protected"],
+    summary="Read a protected profile",
+)
+def protected_profile_unverified(authorization: str | None = Header(default=None)):
+    # Stage 2 only checks that a Bearer token was presented.
+    # Stage 3 verifies it with Supabase.
+    token = require_bearer_token(authorization)
+    return {"message": "Token received", "token_length": len(token)}
 
 @app.get("/tasks", tags=["Tasks"], summary="List all tasks")
 def list_tasks():
