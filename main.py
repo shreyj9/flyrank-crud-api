@@ -5,12 +5,16 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator, model_validator
 
+from database import initialize_database
+
+initialize_database()
+
 app = FastAPI(
     title="Task API",
     version="1.0.0",
     description=(
-        "An in-memory CRUD API for managing tasks. "
-        "Data resets whenever the server restarts."
+        "A SQLite-backed CRUD API for managing tasks. "
+        "Data persists when the server restarts."
     ),
     docs_url="/docs",
     openapi_url="/openapi.json",

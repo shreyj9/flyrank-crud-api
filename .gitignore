@@ -4,3 +4,8 @@ __pycache__/
 .env
 .DS_Store
 .pytest_cache/
+
+# SQLite runtime files
+tasks.db
+tasks.db-shm
+tasks.db-wal
