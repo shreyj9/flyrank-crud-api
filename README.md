@@ -1,15 +1,44 @@
-# FlyRank Task CRUD API
+# FlyRank Task CRUD API — SQLite Edition
 
-A small in-memory REST API built with **Python**, **FastAPI**, and **Swagger UI** for FlyRank's BE-01 assignment. It supports the full CRUD cycle for a to-do list and returns JSON responses with the required HTTP status codes.
+A persistent REST API built with **Python**, **FastAPI**, **SQLite**, and **Swagger UI** for FlyRank's BE-02 database assignment. It keeps the same CRUD endpoints from BE-01, but stores every task in a real SQL database instead of an in-memory list.
+
+## What changed in BE-02
+
+The API contract stayed the same:
+
+```text
+Client → FastAPI endpoints → SQLite database
+```
+
+Tasks now survive server restarts because they are stored in `tasks.db`. The application automatically creates the database, creates the `tasks` table, and inserts the three example tasks only when the table is empty.
+
+## Why SQLite
+
+SQLite was chosen because it:
+
+- requires no separate database server or account;
+- stores the complete database in one local file;
+- supports standard SQL queries;
+- is a practical choice for small applications and backend learning projects.
+
+The runtime database file is stored at:
+
+```text
+./tasks.db
+```
+
+It is intentionally ignored by Git. Anyone cloning the repository gets a fresh database automatically the first time the application starts.
 
 ## Features
 
-- Create, read, update, and delete tasks
-- Three seeded example tasks
+- Full create, read, update, and delete functionality
+- Persistent SQLite storage
+- Automatic table creation and one-time seeding
+- Parameterized SQL queries
 - Input validation with JSON error messages
-- Correct status codes: 200, 201, 204, 400, and 404
+- Correct status codes: `200`, `201`, `204`, `400`, and `404`
 - Interactive Swagger UI at `/docs`
-- In-memory storage, so changes reset when the server restarts
+- Automated CRUD and persistence checks
 
 ## Requirements
 
@@ -21,11 +50,13 @@ A small in-memory REST API built with **Python**, **FastAPI**, and **Swagger UI*
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+python3 -m pip install -r requirements.txt
 ./run.sh
 ```
 
-The server starts at <http://localhost:8000> and Swagger UI is available at <http://localhost:8000/docs>.
+The API starts at <http://localhost:8000>.
+
+Swagger UI is available at <http://localhost:8000/docs>.
 
 ## Endpoints
 
@@ -33,40 +64,75 @@ The server starts at <http://localhost:8000> and Swagger UI is available at <htt
 |---|---|---|---:|
 | GET | `/` | API name, version, and endpoint summary | 200 |
 | GET | `/health` | Server health check | 200 |
-| GET | `/tasks` | List all tasks | 200 |
+| GET | `/tasks` | List every task from SQLite | 200 |
 | GET | `/tasks/{task_id}` | Get one task | 200 |
-| POST | `/tasks` | Create a task | 201 |
+| POST | `/tasks` | Insert a task | 201 |
 | PUT | `/tasks/{task_id}` | Update a task's title and/or completion state | 200 |
 | DELETE | `/tasks/{task_id}` | Delete a task | 204 |
 | GET | `/docs` | Open Swagger UI | 200 |
 
-Unknown task IDs return **404**. Invalid POST or PUT bodies return **400**, with an error object such as:
+Unknown IDs return:
 
 ```json
-{ "error": "Title is required and cannot be empty" }
+{ "error": "Task not found" }
 ```
 
-## Example curl output
+Invalid POST or PUT bodies return status `400` with a JSON error message.
 
-Command:
+## Database schema
+
+The database is initialized with this table:
+
+```sql
+CREATE TABLE IF NOT EXISTS tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    done INTEGER NOT NULL DEFAULT 0 CHECK (done IN (0, 1))
+);
+```
+
+## Database viewer
+
+The screenshot below was generated from the real `tasks.db` database and shows its rows and schema.
+
+![SQLite database viewer showing the tasks table](docs/database-viewer.png)
+
+To regenerate the local viewer and screenshot:
 
 ```bash
-curl -i http://localhost:8000/tasks/1
+./scripts/capture_database_viewer.sh
 ```
 
-Output:
+The script also creates `docs/database-viewer.html`, which can be opened directly in a browser.
 
-```http
-HTTP/1.1 200 OK
-date: Mon, 27 Jul 2026 18:12:11 GMT
-server: uvicorn
-content-length: 51
-content-type: application/json
+## SQL exploration
 
-{"id":1,"title":"Learn FastAPI basics","done":true}
+The assignment's manual SQL queries are saved in [`sql/exploration.sql`](sql/exploration.sql).
+
+Example query:
+
+```sql
+SELECT * FROM tasks WHERE done = 1;
 ```
 
-## Test the full CRUD cycle
+Other queries exercised in Stage 4 include:
+
+```sql
+SELECT * FROM tasks;
+SELECT COUNT(*) FROM tasks;
+UPDATE tasks SET done = 1;
+DELETE FROM tasks WHERE done = 1;
+```
+
+Run the exploration safely against a temporary copy of the database:
+
+```bash
+python3 scripts/run_sql_exploration.py
+```
+
+The captured output is available in [`docs/sql-exploration-output.txt`](docs/sql-exploration-output.txt).
+
+## Test the CRUD API
 
 Start the API in one terminal, then run this in another:
 
@@ -74,49 +140,52 @@ Start the API in one terminal, then run this in another:
 ./scripts/test_api.sh
 ```
 
-The script verifies successful and unsuccessful reads, creation, validation, updating, deletion, and confirmation of deletion.
+The script tests successful and unsuccessful reads, creation, validation, updating, deletion, and confirmation of deletion.
 
-## Swagger UI
+## Test persistence
 
-Open <http://localhost:8000/docs>, expand an endpoint, select **Try it out**, enter any required values, and select **Execute**.
-
-To capture the live Swagger UI screenshot after the server is running:
+Run:
 
 ```bash
-./scripts/capture_swagger.sh
+python3 scripts/test_persistence.py
 ```
 
-![Swagger UI showing the Task API endpoints](docs/swagger-ui.png)
-
-## In-memory behavior
-
-Tasks are stored in the `tasks` list while the Python process is running. Any tasks created or changed through the API disappear after a restart because no database or file is used. This is expected for the assignment and demonstrates why persistent databases are needed.
+This creates a temporary SQLite database, inserts an additional task, reloads the application, and confirms that the task still exists and that the three seed tasks were not duplicated.
 
 ## Project structure
 
 ```text
 .
+├── database.py
+├── main.py
+├── tasks.db                       # generated locally; ignored by Git
 ├── docs/
-│   ├── swagger-preview.html
+│   ├── database-viewer.html
+│   ├── database-viewer.png
+│   ├── sql-exploration-output.txt
 │   └── swagger-ui.png
 ├── scripts/
-│   ├── capture_swagger.sh
-│   └── test_api.sh
+│   ├── capture_database_viewer.py
+│   ├── capture_database_viewer.sh
+│   ├── generate_database_viewer.py
+│   ├── run_sql_exploration.py
+│   ├── test_api.sh
+│   └── test_persistence.py
+├── sql/
+│   └── exploration.sql
 ├── .gitignore
-├── main.py
 ├── README.md
 ├── requirements.txt
 └── run.sh
 ```
 
-## Git stages
+## Assignment commit history
 
-The repository history contains one meaningful commit for every required stage:
+The repository preserves the BE-01 history and adds one meaningful commit for each BE-02 stage:
 
-1. `Stage 0: hello server`
-2. `Stage 1: root and health endpoints`
-3. `Stage 2: read endpoints with 404`
-4. `Stage 3: create with validation`
-5. `Stage 4: full CRUD`
-6. `Stage 5: Swagger UI`
-7. `Stage 6: publish and docs`
+1. `Stage 0: create SQLite database`
+2. `Stage 1: database read endpoints`
+3. `Stage 2: insert into database`
+4. `Stage 3: update and delete with SQL`
+5. `Stage 4: explored SQLite`
+6. `Stage 5: database documentation`
