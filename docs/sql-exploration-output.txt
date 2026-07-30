@@ -1,0 +1,17 @@
+SELECT * FROM tasks;
+{'id': 1, 'title': 'Learn FastAPI basics', 'done': 1}
+{'id': 2, 'title': 'Build CRUD endpoints', 'done': 0}
+{'id': 3, 'title': 'Document the API', 'done': 0}
+
+SELECT * FROM tasks WHERE done = 1;
+{'id': 1, 'title': 'Learn FastAPI basics', 'done': 1}
+
+SELECT COUNT(*) FROM tasks;
+3 tasks
+
+UPDATE tasks SET done = 1;
+3 tasks are now completed
+
+DELETE FROM tasks WHERE done = 1;
+0 tasks remain
+Exploration used a temporary copy; the project database was not changed.
