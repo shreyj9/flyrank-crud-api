@@ -1,0 +1,19 @@
+$ docker compose ps
+NAME                     IMAGE                  COMMAND                  SERVICE   CREATED          STATUS                    PORTS
+flyrank-crud-api-api-1   flyrank-crud-api-api   "uvicorn main:app --…"   api       32 seconds ago   Up 28 seconds             0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp
+flyrank-crud-api-db-1    postgres:17-alpine     "docker-entrypoint.s…"   db        32 seconds ago   Up 31 seconds (healthy)   0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp
+
+$ docker compose exec -T db psql -U <user> -d <database> -c '\dt' -c 'SELECT id, title, done FROM tasks ORDER BY id;'
+         List of relations
+ Schema | Name  | Type  |  Owner   
+--------+-------+-------+----------
+ public | tasks | table | taskuser
+(1 row)
+
+ id |                       title                        | done 
+----+----------------------------------------------------+------
+  1 | Learn FastAPI basics                               | t
+  2 | Build CRUD endpoints                               | f
+  3 | Document the API                                   | f
+  5 | Persistence proof 2026-07-30T06:03:31.299407+00:00 | f
+(4 rows)

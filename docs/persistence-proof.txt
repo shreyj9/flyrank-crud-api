@@ -1,0 +1,15 @@
+FlyRank BE-04 Postgres persistence proof
+Verified at: 2026-07-30T06:03:41.707278+00:00
+Created task id: 5
+Created title: Persistence proof 2026-07-30T06:03:31.299407+00:00
+Restart performed with: docker compose down && docker compose up -d
+Result: task remained available after the app and DB containers restarted.
+
+Postgres rows after restart:
+ id |                       title                        | done 
+----+----------------------------------------------------+------
+  1 | Learn FastAPI basics                               | t
+  2 | Build CRUD endpoints                               | f
+  3 | Document the API                                   | f
+  5 | Persistence proof 2026-07-30T06:03:31.299407+00:00 | f
+(4 rows)
