@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator, model_validator
 
 from auth_models import AuthCredentials
-from auth_service import login_user, signup_user
+from auth_service import login_user, signup_user, verify_access_token
 
 from database import (
     delete_task_record,
@@ -134,11 +134,9 @@ def public_info():
     tags=["Protected"],
     summary="Read a protected profile",
 )
-def protected_profile_unverified(authorization: str | None = Header(default=None)):
-    # Stage 2 only checks that a Bearer token was presented.
-    # Stage 3 verifies it with Supabase.
+def protected_profile(authorization: str | None = Header(default=None)):
     token = require_bearer_token(authorization)
-    return {"message": "Token received", "token_length": len(token)}
+    return {"user": verify_access_token(token)}
 
 @app.get("/tasks", tags=["Tasks"], summary="List all tasks")
 def list_tasks():

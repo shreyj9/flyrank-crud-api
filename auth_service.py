@@ -59,3 +59,19 @@ def login_user(email: str, password: str) -> dict[str, object]:
         "token_type": "bearer",
         "expires_in": response.session.expires_in,
     }
+
+
+def verify_access_token(token: str) -> dict[str, object | None]:
+    """Ask Supabase to validate a JWT and return safe user metadata."""
+    try:
+        response = supabase.auth.get_user(token)
+    except Exception as error:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired token",
+        ) from error
+
+    if response.user is None:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    return serialize_user(response.user)
