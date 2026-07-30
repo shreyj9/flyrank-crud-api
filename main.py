@@ -5,7 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator, model_validator
 
-from database import initialize_database
+from database import fetch_all_tasks, fetch_task, initialize_database
 
 initialize_database()
 
@@ -61,9 +61,9 @@ class TaskUpdate(BaseModel):
 
 
 def find_task(task_id: int) -> dict[str, Any]:
-    task = next((item for item in tasks if item["id"] == task_id), None)
+    task = fetch_task(task_id)
     if task is None:
-        raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+        raise HTTPException(status_code=404, detail="Task not found")
     return task
 
 
@@ -93,7 +93,7 @@ def health_check():
 
 @app.get("/tasks", tags=["Tasks"], summary="List all tasks")
 def list_tasks():
-    return tasks
+    return fetch_all_tasks()
 
 
 @app.get("/tasks/{task_id}", tags=["Tasks"], summary="Get one task")

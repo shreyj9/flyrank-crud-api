@@ -50,3 +50,31 @@ def initialize_database() -> None:
                 "INSERT INTO tasks (title, done) VALUES (?, ?)",
                 SEED_TASKS,
             )
+
+
+def row_to_task(row: sqlite3.Row) -> dict[str, object]:
+    """Convert a SQLite row into the API's JSON-friendly task shape."""
+    return {
+        "id": int(row["id"]),
+        "title": str(row["title"]),
+        "done": bool(row["done"]),
+    }
+
+
+def fetch_all_tasks() -> list[dict[str, object]]:
+    """Return every task ordered by id."""
+    with get_connection() as connection:
+        rows = connection.execute(
+            "SELECT id, title, done FROM tasks ORDER BY id"
+        ).fetchall()
+    return [row_to_task(row) for row in rows]
+
+
+def fetch_task(task_id: int) -> dict[str, object] | None:
+    """Return one task, or None when the id is unknown."""
+    with get_connection() as connection:
+        row = connection.execute(
+            "SELECT id, title, done FROM tasks WHERE id = ?",
+            (task_id,),
+        ).fetchone()
+    return row_to_task(row) if row is not None else None
