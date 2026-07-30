@@ -52,7 +52,22 @@ request dashboard-valid 200 \
   "$BASE_URL/protected/dashboard" \
   -H "Authorization: Bearer $ACCESS_TOKEN"
 
-TAMPERED_TOKEN="${ACCESS_TOKEN%?}x"
+TAMPERED_TOKEN="$(python3 - "$ACCESS_TOKEN" <<'PYTOKEN'
+import sys
+
+token = sys.argv[1]
+parts = token.split(".")
+if len(parts) != 3 or not parts[2]:
+    raise SystemExit("Unexpected JWT format")
+
+signature = parts[2]
+index = len(signature) // 2
+replacement = "A" if signature[index] != "A" else "B"
+parts[2] = signature[:index] + replacement + signature[index + 1:]
+
+print(".".join(parts))
+PYTOKEN
+)"
 request profile-tampered 401 \
   "$BASE_URL/protected/profile" \
   -H "Authorization: Bearer $TAMPERED_TOKEN"
