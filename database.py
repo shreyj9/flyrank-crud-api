@@ -78,3 +78,18 @@ def fetch_task(task_id: int) -> dict[str, object] | None:
             (task_id,),
         ).fetchone()
     return row_to_task(row) if row is not None else None
+
+
+def insert_task(title: str) -> dict[str, object]:
+    """Insert a new incomplete task and return it."""
+    with get_connection() as connection:
+        cursor = connection.execute(
+            "INSERT INTO tasks (title, done) VALUES (?, 0)",
+            (title,),
+        )
+        task_id = int(cursor.lastrowid)
+
+    created_task = fetch_task(task_id)
+    if created_task is None:  # Defensive: the inserted row should always exist.
+        raise RuntimeError("Created task could not be loaded")
+    return created_task
