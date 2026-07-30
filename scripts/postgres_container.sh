@@ -12,7 +12,7 @@ usage() {
 Usage: ./scripts/postgres_container.sh <start|shell|status|stop|remove>
 
 Before start, set POSTGRES_PASSWORD in your shell. Example:
-  POSTGRES_PASSWORD=dev ./scripts/postgres_container.sh start
+  POSTGRES_PASSWORD=choose-a-local-password ./scripts/postgres_container.sh start
 USAGE
 }
 

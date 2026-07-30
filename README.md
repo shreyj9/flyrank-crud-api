@@ -1,201 +1,237 @@
-# FlyRank Task CRUD API — SQLite Edition
+# FlyRank Task CRUD API — Docker + Postgres
 
-A persistent REST API built with **Python**, **FastAPI**, **SQLite**, and **Swagger UI** for FlyRank's BE-02 database assignment. It keeps the same CRUD endpoints from BE-01, but stores every task in a real SQL database instead of an in-memory list.
+A containerized REST API built with **Python**, **FastAPI**, **PostgreSQL**, and **Docker Compose** for FlyRank BE-04. The API and database start together with one command, and a named Docker volume keeps task data after both containers restart.
 
-## What changed in BE-02
-
-The API contract stayed the same:
+This repository preserves the storage progression from the earlier assignments:
 
 ```text
-Client → FastAPI endpoints → SQLite database
+BE-01: FastAPI routes → in-memory list
+BE-02: FastAPI routes → SQLite file
+BE-04: FastAPI routes → Postgres repository → Postgres container + volume
 ```
 
-Tasks now survive server restarts because they are stored in `tasks.db`. The application automatically creates the database, creates the `tasks` table, and inserts the three example tasks only when the table is empty.
+## Architecture proof
 
-## Why SQLite
+The public API contract did not change. The same route handlers in `main.py` still call the same repository functions:
 
-SQLite was chosen because it:
+- `fetch_all_tasks()`
+- `fetch_task()`
+- `insert_task()`
+- `update_task_record()`
+- `delete_task_record()`
 
-- requires no separate database server or account;
-- stores the complete database in one local file;
-- supports standard SQL queries;
-- is a practical choice for small applications and backend learning projects.
-
-The runtime database file is stored at:
+For BE-04, the SQL implementation inside `database.py` changed from SQLite to Postgres, and Docker infrastructure files were added. The route behavior and request/response shapes stayed the same. Only the FastAPI description text was updated so Swagger identifies the current Postgres storage engine.
 
 ```text
-./tasks.db
+Client → FastAPI routes → database.py repository → Postgres service → taskdata volume
 ```
-
-It is intentionally ignored by Git. Anyone cloning the repository gets a fresh database automatically the first time the application starts.
-
-## Features
-
-- Full create, read, update, and delete functionality
-- Persistent SQLite storage
-- Automatic table creation and one-time seeding
-- Parameterized SQL queries
-- Input validation with JSON error messages
-- Correct status codes: `200`, `201`, `204`, `400`, and `404`
-- Interactive Swagger UI at `/docs`
-- Automated CRUD and persistence checks
 
 ## Requirements
 
-- Python 3.10 or newer
-- pip
+- Docker Desktop with Docker Compose
+- Git
+- Optional for local verification scripts: Python 3.10+ and the existing `.venv`
 
-## Install and run
+No local Postgres installation is required.
+
+## One-command stack
+
+Create the local environment file once:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python3 -m pip install -r requirements.txt
-./run.sh
+cp .env.example .env
 ```
 
-The API starts at <http://localhost:8000>.
+Then start the API and Postgres together:
 
-Swagger UI is available at <http://localhost:8000/docs>.
+```bash
+docker compose up
+```
+
+Use `-d` to run in the background:
+
+```bash
+docker compose up -d
+```
+
+The API is available at:
+
+- API: <http://localhost:8000>
+- Swagger UI: <http://localhost:8000/docs>
+
+Stop both containers while keeping the database volume:
+
+```bash
+docker compose down
+```
+
+`docker compose down -v` also deletes the volume and should only be used when a complete database reset is intended.
+
+## Environment variables
+
+`.env` is ignored by Git. `.env.example` documents the required local variables:
+
+| Variable | Purpose |
+|---|---|
+| `POSTGRES_USER` | Local Postgres user |
+| `POSTGRES_PASSWORD` | Local development password |
+| `POSTGRES_DB` | Database name |
+| `API_PORT` | Host port for FastAPI |
+| `DATABASE_URL` | Connection string used by the repository |
+
+Inside the Compose network, the API connects to the hostname `db`, which is the Postgres service name. It does not use `localhost` from inside the API container.
+
+## Automatic database setup
+
+At startup, `database.py`:
+
+1. reads `DATABASE_URL` from the environment;
+2. waits for Postgres to accept connections;
+3. executes [`sql/postgres_schema.sql`](sql/postgres_schema.sql);
+4. inserts the three example tasks only when the table is empty.
+
+Schema:
+
+```sql
+CREATE TABLE IF NOT EXISTS tasks (
+    id SERIAL PRIMARY KEY,
+    title TEXT NOT NULL,
+    done BOOLEAN NOT NULL DEFAULT FALSE
+);
+```
+
+All user-controlled values are passed separately through psycopg `%s` placeholders. They are never concatenated into SQL strings.
 
 ## Endpoints
 
 | Method | Endpoint | Purpose | Success status |
 |---|---|---|---:|
-| GET | `/` | API name, version, and endpoint summary | 200 |
-| GET | `/health` | Server health check | 200 |
-| GET | `/tasks` | List every task from SQLite | 200 |
+| GET | `/` | API information | 200 |
+| GET | `/health` | API health | 200 |
+| GET | `/tasks` | List all Postgres tasks | 200 |
 | GET | `/tasks/{task_id}` | Get one task | 200 |
-| POST | `/tasks` | Insert a task | 201 |
-| PUT | `/tasks/{task_id}` | Update a task's title and/or completion state | 200 |
+| POST | `/tasks` | Create a task | 201 |
+| PUT | `/tasks/{task_id}` | Update title and/or completion | 200 |
 | DELETE | `/tasks/{task_id}` | Delete a task | 204 |
-| GET | `/docs` | Open Swagger UI | 200 |
+| GET | `/docs` | Swagger UI | 200 |
 
-Unknown IDs return:
+Unknown task IDs return status `404`:
 
 ```json
-{ "error": "Task not found" }
+{"error":"Task not found"}
 ```
 
-Invalid POST or PUT bodies return status `400` with a JSON error message.
+Invalid POST and PUT bodies return status `400` with a JSON error message.
 
-## Database schema
-
-The database is initialized with this table:
-
-```sql
-CREATE TABLE IF NOT EXISTS tasks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    done INTEGER NOT NULL DEFAULT 0 CHECK (done IN (0, 1))
-);
-```
-
-## Database viewer
-
-The screenshot below was generated from the real `tasks.db` database and shows its rows and schema.
-
-![SQLite database viewer showing the tasks table](docs/database-viewer.png)
-
-To regenerate the local viewer and screenshot:
+## Example curl request
 
 ```bash
-./scripts/capture_database_viewer.sh
+curl -i -X POST http://localhost:8000/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Persist this Postgres task"}'
 ```
 
-The script also creates `docs/database-viewer.html`, which can be opened directly in a browser.
+Example response:
 
-## SQL exploration
+```text
+HTTP/1.1 201 Created
+content-type: application/json
 
-The assignment's manual SQL queries are saved in [`sql/exploration.sql`](sql/exploration.sql).
-
-Example query:
-
-```sql
-SELECT * FROM tasks WHERE done = 1;
+{"id":4,"title":"Persist this Postgres task","done":false}
 ```
 
-Other queries exercised in Stage 4 include:
+## Full verification and persistence proof
 
-```sql
-SELECT * FROM tasks;
-SELECT COUNT(*) FROM tasks;
-UPDATE tasks SET done = 1;
-DELETE FROM tasks WHERE done = 1;
-```
-
-Run the exploration safely against a temporary copy of the database:
+With Docker Desktop running, use:
 
 ```bash
-python3 scripts/run_sql_exploration.py
+./scripts/verify_stack.sh
 ```
 
-The captured output is available in [`docs/sql-exploration-output.txt`](docs/sql-exploration-output.txt).
+That script:
 
-## Test the CRUD API
+1. starts and builds the full Compose stack;
+2. runs the unchanged CRUD endpoint checks;
+3. creates a task in Postgres;
+4. runs `docker compose down` and starts the stack again;
+5. verifies the exact task still exists;
+6. captures the real `psql` table and row output.
 
-Start the API in one terminal, then run this in another:
+The restart keeps the named volume `taskdata`, which is why the row survives. The generated proof is written to:
+
+- `docs/persistence-proof.txt`
+- `docs/postgres-database.txt`
+- `docs/postgres-database.png`
+
+After running the verification script, the database screenshot appears here:
+
+![Postgres tasks table shown through psql](docs/postgres-database.png)
+
+## Inspect Postgres manually
+
+Open `psql` inside the database container:
+
+```bash
+docker compose exec db psql \
+  -U "$(awk -F= '$1 == "POSTGRES_USER" {print $2}' .env)" \
+  -d "$(awk -F= '$1 == "POSTGRES_DB" {print $2}' .env)"
+```
+
+Useful commands:
+
+```sql
+\dt
+SELECT id, title, done FROM tasks ORDER BY id;
+\q
+```
+
+## Test only the CRUD API
+
+With the stack running:
 
 ```bash
 ./scripts/test_api.sh
 ```
 
-The script tests successful and unsuccessful reads, creation, validation, updating, deletion, and confirmation of deletion.
-
-## Test persistence
-
-Run:
-
-```bash
-python3 scripts/test_persistence.py
-```
-
-This creates a temporary SQLite database, inserts an additional task, reloads the application, and confirms that the task still exists and that the three seed tasks were not duplicated.
+The test covers `200`, `201`, `204`, `400`, and `404` responses and dynamically uses the ID returned by Postgres.
 
 ## Project structure
 
 ```text
 .
+├── compose.yaml
+├── Dockerfile
+├── .dockerignore
+├── .env.example
 ├── database.py
 ├── main.py
-├── tasks.db                       # generated locally; ignored by Git
-├── docs/
-│   ├── database-viewer.html
-│   ├── database-viewer.png
-│   ├── sql-exploration-output.txt
-│   └── swagger-ui.png
-├── scripts/
-│   ├── capture_database_viewer.py
-│   ├── capture_database_viewer.sh
-│   ├── generate_database_viewer.py
-│   ├── run_sql_exploration.py
-│   ├── test_api.sh
-│   └── test_persistence.py
-├── sql/
-│   └── exploration.sql
-├── .gitignore
-├── README.md
 ├── requirements.txt
-└── run.sh
+├── sql/
+│   ├── postgres_schema.sql
+│   └── exploration.sql              # preserved BE-02 SQL work
+├── scripts/
+│   ├── postgres_container.sh
+│   ├── test_api.sh
+│   ├── test_persistence.py
+│   ├── capture_postgres_evidence.py
+│   └── verify_stack.sh
+└── docs/
+    ├── postgres-database.png         # generated from real psql output
+    ├── postgres-database.txt         # generated from real psql output
+    ├── persistence-proof.txt         # generated by restart test
+    ├── swagger-ui.png
+    └── sqlite-*                      # preserved BE-02 evidence
 ```
 
 ## Assignment commit history
 
-The repository preserves the BE-01 history and adds one meaningful commit for each BE-02 stage:
+The repository preserves BE-01 and BE-02 and adds one commit per BE-04 stage:
 
-1. `Stage 0: create SQLite database`
-2. `Stage 1: database read endpoints`
-3. `Stage 2: insert into database`
-4. `Stage 3: update and delete with SQL`
-5. `Stage 4: explored SQLite`
-6. `Stage 5: database documentation`
+1. `Stage 0: Postgres in Docker + gitignore`
+2. `Stage 1: connect via .env and create table`
+3. `Stage 2: read from Postgres`
+4. `Stage 3: full CRUD on Postgres`
+5. `Stage 4: docker-compose the whole stack`
+6. `Stage 5: one-command stack + docs`
 
-## BE-04 Stage 0: standalone Postgres container
-
-Before the Compose stack is introduced, Postgres can be started independently with:
-
-```bash
-POSTGRES_PASSWORD=dev ./scripts/postgres_container.sh start
-```
-
-The helper mounts the named Docker volume `taskdata`, so rows outlive the container.
+A final evidence commit can be added after the local Docker verification generates the real screenshot and proof files.
